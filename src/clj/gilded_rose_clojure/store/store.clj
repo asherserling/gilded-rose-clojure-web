@@ -1,24 +1,15 @@
 (ns gilded-rose-clojure.store.store)
 
-(defn make-store [items]
-  (assert (vector? items))
-  (->> items
-       (map (fn [item] (atom item)))
-       vec))
+(def initial-store-state
+  [{:name "+5 Dexterity Vest", :quality 20, :sell-in 10}
+   {:name "Aged Brie", :quality 0, :sell-in 2}
+   {:name "Elixir of the Mongoose", :quality 7, :sell-in 5}
+   {:name "Sulfuras, Hand of Ragnaros", :quality 80, :sell-in 0}
+   {:name "Sulfuras, Hand of Ragnaros", :quality 80, :sell-in -1}
+   {:name "Backstage passes to a TAFKAL80ETC concert", :quality 20, :sell-in 15}
+   {:name "Backstage passes to a TAFKAL80ETC concert", :quality 49, :sell-in 10}
+   {:name "Backstage passes to a TAFKAL80ETC concert", :quality 49, :sell-in 5}])
 
-(defn item-seq [store]
-  (->> store
-       (map deref)))
-
-(defn make-store [items]
-  (assert (vector? items))
-  (->> items
-       (map (fn [item] (atom item)))
-       vec))
-
-(defn item-seq [store]
-  (->> store
-       (map deref)))
 
 (defn make-quality-degrader [degradation-rate]
   (fn [{:keys [quality sell-in]}]
@@ -56,12 +47,36 @@
   (or (get-in rules [(:name item) key])
       (get-in rules [:default key])))
 
-(defn update-item [item]
+(defn increment-day-item [item]
   (-> item
       (update-in [:sell-in] (get-updater item :sell-in))
       (assoc :quality ((get-updater item :quality) item))
       (update-in [:quality] (get-updater item :max-quality))))
 
-(defn update-quality! [store]
-  (doseq [item store]
-    (reset! item (update-item @item))))
+(defn increment-day-store [store]
+  (->> store
+       (map increment-day-item)
+       vec))
+
+(defn make-store [fixture]
+  (ref fixture))
+
+(defn increment-day! [store]
+  (alter store increment-day-store))
+
+(defn reset-store! [store] 
+  (dosync
+   (ref-set store initial-store-state)))
+
+(defn add-item-store! [store item]
+  (dosync
+   (alter store conj item)))
+
+(comment
+  (let [store (make-store initial-store-state)]
+    (dosync
+     (increment-day! store)))
+  
+  (let [store (atom initial-store-state)]
+    (add-item-store! store {:name "chummus" :sell-in 25 :quality 3})
+    @store))
